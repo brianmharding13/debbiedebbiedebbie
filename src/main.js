@@ -21,11 +21,11 @@ const LINE_HEIGHT = FONT_SIZE * 0.62;
 const COLUMN_WIDTH = FONT_SIZE * 1.5;
 const TRAIL_LENGTH = 16;
 const FADE_ALPHA = 0.08;
-const BG_COLOR = '12, 5, 22';
-const TEXT_COLOR = '206, 110, 255';
-const HEAD_COLOR = '238, 205, 255';
+const BG_COLOR = '16, 11, 2';
+const TEXT_COLOR = '255, 191, 0';
+const HEAD_COLOR = '255, 248, 214';
 const FLASH_COLOR = '255, 255, 255';
-const GLOW_COLOR = 'rgba(196, 90, 255, 0.9)';
+const GLOW_COLOR = 'rgba(255, 176, 0, 0.9)';
 
 let columns = [];
 let totalTravel = 0;
