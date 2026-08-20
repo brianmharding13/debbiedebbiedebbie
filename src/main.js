@@ -1,8 +1,5 @@
 import './style.css';
 
-const canvas = document.getElementById('rain');
-const ctx = canvas.getContext('2d');
-
 const VOWELS = ['A', 'E', 'I', 'O', 'U'];
 // DEBBIE, with only the first E swapped for a random vowel each spawn. The
 // trailing "IE" stays put, so a random draw of "E" reforms the real word.
@@ -26,24 +23,17 @@ const TEXT_COLOR = '255, 191, 0';
 const HEAD_COLOR = '255, 248, 214';
 const FLASH_COLOR = '255, 255, 255';
 const GLOW_COLOR = 'rgba(255, 176, 0, 0.9)';
+const MAX_EXPORT_DIMENSION = 8000;
 
-let columns = [];
-let totalTravel = 0;
-
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  totalTravel = canvas.height + LINE_HEIGHT * (TRAIL_LENGTH + 2);
-  const count = Math.ceil(canvas.width / COLUMN_WIDTH) + 1;
-  columns = Array.from({ length: count }, () => makeColumn());
-}
-
-function makeColumn() {
-  return {
+function buildColumns(width, height) {
+  const totalTravel = height + LINE_HEIGHT * (TRAIL_LENGTH + 2);
+  const count = Math.ceil(width / COLUMN_WIDTH) + 1;
+  const columns = Array.from({ length: count }, () => ({
     pos: Math.random() * totalTravel,
     speed: 0.35 + Math.random() * 1.5,
     cache: new Map(),
-  };
+  }));
+  return { columns, totalTravel };
 }
 
 function rowInfo(col, rowIndex) {
@@ -62,7 +52,7 @@ function rowInfo(col, rowIndex) {
   return col.cache.get(rowIndex);
 }
 
-function drawStatic(width, height) {
+function drawStatic(ctx, width, height) {
   const dotCount = Math.floor((width * height) / 1600);
   for (let i = 0; i < dotCount; i++) {
     const x = Math.random() * width;
@@ -78,13 +68,13 @@ function drawStatic(width, height) {
     const bandHeight = 2 + Math.random() * 10;
     const y = Math.random() * height;
     const shift = (Math.random() - 0.5) * 90;
-    ctx.drawImage(canvas, 0, y, width, bandHeight, shift, y, width, bandHeight);
+    ctx.drawImage(ctx.canvas, 0, y, width, bandHeight, shift, y, width, bandHeight);
     ctx.fillStyle = `rgba(255,255,255,${0.05 + Math.random() * 0.08})`;
     ctx.fillRect(0, y, width, bandHeight);
   }
 }
 
-function draw() {
+function drawFrame(ctx, canvas, columns, totalTravel) {
   ctx.fillStyle = `rgba(${BG_COLOR}, ${FADE_ALPHA})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -128,11 +118,71 @@ function draw() {
     col.pos += col.speed;
   });
 
-  drawStatic(canvas.width, canvas.height);
-
-  requestAnimationFrame(draw);
+  drawStatic(ctx, canvas.width, canvas.height);
 }
 
-resize();
-window.addEventListener('resize', resize);
-draw();
+function runLiveCanvas() {
+  const canvas = document.getElementById('rain');
+  const ctx = canvas.getContext('2d');
+  let state = null;
+
+  function resize() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    state = buildColumns(canvas.width, canvas.height);
+  }
+
+  function loop() {
+    drawFrame(ctx, canvas, state.columns, state.totalTravel);
+    requestAnimationFrame(loop);
+  }
+
+  resize();
+  window.addEventListener('resize', resize);
+  loop();
+}
+
+function downloadCanvas(canvas, filename) {
+  canvas.toBlob((blob) => {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 'image/png');
+}
+
+function runExport(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const { columns, totalTravel } = buildColumns(width, height);
+
+  // Enough frames to fill every trail at least once and build up natural static/glitch texture.
+  const warmupFrames = TRAIL_LENGTH * 20;
+  for (let i = 0; i < warmupFrames; i++) {
+    drawFrame(ctx, canvas, columns, totalTravel);
+  }
+
+  downloadCanvas(canvas, `debbie-${width}x${height}.png`);
+}
+
+function parseExportParam(value) {
+  const match = /^(\d+)(?:x(\d+))?$/.exec(value.trim());
+  if (!match) return null;
+  const width = Math.min(Number(match[1]), MAX_EXPORT_DIMENSION);
+  const height = Math.min(Number(match[2] ?? match[1]), MAX_EXPORT_DIMENSION);
+  return { width, height };
+}
+
+runLiveCanvas();
+
+const exportParam = new URLSearchParams(window.location.search).get('export');
+if (exportParam) {
+  const size = parseExportParam(exportParam);
+  if (size) runExport(size.width, size.height);
+}
